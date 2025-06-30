@@ -1,13 +1,18 @@
 #![allow(non_snake_case)]
-
-use dioxus::prelude::*;
+use dioxus::{prelude::*};
+use web_sys;
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{prelude::*, JsCast};
 
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "core"])]
     async fn invoke(cmd: &str, args: JsValue) -> JsValue;
+}
+
+#[wasm_bindgen(js_namespace = ["window", "__TAURI__", "event"], js_name = listen)]
+extern "C" {
+    fn tauri_listen(event: &str, cb: &js_sys::Function);
 }
 
 #[derive(Serialize, Deserialize)]
@@ -30,6 +35,27 @@ pub fn App() -> Element {
         let new_msg = invoke("greet", args).await.as_string().unwrap();
         greet_msg.set(new_msg);
     };
+
+    use_effect(||{
+        let cb = Closure::<dyn FnMut(js_sys::Object)>::wrap(Box::new(|evt| {
+            if let Ok(payload) = js_sys::Reflect::get(&evt, &"payload".into()) {
+                if let Some(theme) = payload.as_string() {
+                    if let Some(doc) = web_sys::window().unwrap().document() {
+                        if let Some(root_el) = doc.document_element() {
+                            match theme.as_str() {
+                                "dark" => _ = root_el.set_attribute("data-theme", "dark"),
+                                "light" => _ = root_el.set_attribute("data-theme", "light"),
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }));
+
+        tauri_listen("theme_changed", cb.as_ref().unchecked_ref());
+        cb.forget();
+    });
 
     rsx! {
         link { rel: "stylesheet", href: "styles.css" }

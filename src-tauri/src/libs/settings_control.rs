@@ -1,11 +1,11 @@
-use std::{io::Write, path::Path};
+use std::{io::{Read, Write}, path::Path};
 use serde::{Deserialize, Serialize};
 use toml;
 
 #[derive(Serialize, Deserialize)]
-struct Resolution {
-    width: u32,
-    height: u32,
+pub struct Resolution {
+   pub width: u32,
+   pub height: u32,
 }
 
 impl Default for Resolution {
@@ -28,7 +28,7 @@ impl Default for Settings {
 }
 
 #[derive(Deserialize, Serialize)]
-struct Settings {
+pub struct Settings {
     #[serde(default)]
     pub language: String,
     #[serde(default)]
@@ -62,7 +62,16 @@ pub fn check_settings_file() -> Result<(), Box<dyn std::error::Error>> {
         println!("設定ファイルが見つかりませんでした、新しいファイルを作成します...");
         create_settings_file()?;
     } else {
-        println!("ファイルが存在します。 設定ファイル場所: {}", &settings_path.display());
+        println!("ファイルが存在します。設定をロードします。 設定ファイル場所: {}", &settings_path.display());
     }
     Ok(())
+}
+
+pub fn load_settings() -> Result<Settings, Box<dyn std::error::Error>> {
+    let settings_path = settings_path()?;
+    let mut file = std::fs::File::open(&settings_path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    let settings: Settings = toml::from_str(&contents)?;
+    Ok(settings)
 }
